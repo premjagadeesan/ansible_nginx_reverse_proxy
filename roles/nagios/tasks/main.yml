@@ -1,0 +1,12 @@
+---
+- name: Copy nginx configuration for wordpress
+  template: src=nginx.conf dest=/etc/nginx/nginx.conf
+- name: Restart nginx reverse proxy
+  shell: service nginx restart
+- name: Copy grafana conf to ec2 instance
+  template: src=grafana.ini dest=/tmp/grafana.ini
+- name: Copy the grafana conf file from tmp directory to docker container
+  shell: docker cp /tmp/grafana.ini nostalgic_galileo:/etc/grafana/grafana.ini
+- name: restart docker container
+  shell: docker restart nostalgic_galileo
+

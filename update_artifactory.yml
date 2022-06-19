@@ -1,0 +1,30 @@
+-
+  name: 'editing the docker containers'
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+  - name: add host to group 'just_created' with variable foo=42
+    add_host:
+      name: "{{ host_name }}"
+  - name: Retrive the configuration file from remote the artifactory container
+    shell: curl -u admin:password -X GET -H "Accept: application/xml" http://{{ host_name }}:8081/artifactory/api/system/configuration > artifactory.config.xml
+  - name: Find and replace the host_name in config file
+    shell: sed -i 's/temp-hostname/{{ host_name }}/g' artifactory.config.xml
+  - name: Find and replace the app_name in config file
+    shell: sed -i 's/temp-hostname/{{ app_name }}/g' artifactory.config.xml
+  - name: Update the configuration file in the remote the artifactory container
+    shell: curl -u admin:password -X POST -H "Content-type:application/xml" --data-binary @artifactory.config.xml http://{{ host_name }}:8081/artifactory/api/system/configuration
+  - name: remote the artifactory configuration file from ansible server
+    shell: rm -f artifactory.config.xml
+-
+  become: true
+  become_method: sudo
+  hosts: all
+  name: "Update the path in ansible container"
+  remote_user: ec2-user
+  vars:
+    ansible_ssh_private_key_file: /usr/share/ansible-dir/ansible-opsera/keys/test.pem
+  roles:
+    - artifactory
+

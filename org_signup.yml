@@ -1,0 +1,63 @@
+-
+  name: 'organisation signup playbook'
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - elb_target_group:
+        name: "tg-{{ org_name }}-elk"
+        region: "us-east-2"
+        protocol: http
+        port: 80
+        vpc_id: vpc-c74a09ae
+        health_check_protocol: "HTTP"
+        health_check_path: "/elasticsearch"
+        health_check_port: "80"
+        successful_response_codes: "200,250-260"
+        targets:
+          - Id: "{{ instance_id }}"
+            Port: 80
+        state: present
+      register: tg_info    
+    - debug: var=tg_info
+    - elb_application_lb:
+        name: "{{ org_name }}"
+        region: "us-east-2"
+        security_groups:
+          - ansible-test-elb-sg
+        subnets:
+          - subnet-2edd4155
+          - subnet-86edbdef
+          - subnet-cedf7983
+        listeners:
+          - Protocol: HTTPS
+            Port: 443
+            # The security policy that defines which ciphers and protocols are supported. The default is the current predefined security policy.
+            SslPolicy: ELBSecurityPolicy-2015-05
+            Certificates: # The ARN of the certificate (only one certficate ARN should be provided)
+              - CertificateArn: arn:aws:acm:us-east-2:440953937617:certificate/9c8e1dd4-b22e-4921-9ca1-65fbe428ff02
+            DefaultActions:
+              - Type: forward
+                TargetGroupName: "tg-{{ org_name }}-elk"
+        state: present
+      register: elb_info
+    - debug: var=elb_info
+    - name: Create the redirect listener for HTTP => HTTPS because elb_application_lb does not yet support it
+      shell: >
+        aws elbv2 create-listener
+        --region "us-east-2"
+        --load-balancer-arn {{ elb_info.load_balancer_arn }}
+        --protocol HTTP
+        --port 80
+        --default-actions "Type=redirect,RedirectConfig={Protocol=HTTPS,Port=443,Host='#{host}',Query='#{query}',Path='/#{path}',StatusCode=HTTP_301}"
+    - route53:
+        state: present
+        zone: opsera.io
+        hosted_zone_id: Z1TIQL15FE1S33
+        record: '{{ org_name }}.opsera.io'
+        type: A
+        value: "{{ elb_info.dns_name }}"
+        alias: True
+        alias_hosted_zone_id: "{{ elb_info.canonical_hosted_zone_id }}"
+      register: r53_info
+    - debug: var=r53_info

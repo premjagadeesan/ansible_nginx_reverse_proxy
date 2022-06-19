@@ -1,0 +1,101 @@
+-
+  name: 'organisation signup playbook'
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "convert strint to int"
+      set_fact: 'int_port=80'
+      when: "{{ port }}"  == "80"
+    - name: 'limiting the targegroup name to 32 characters'
+      set_fact: 'tg_name_full="{{org_name}}-{{app_name}}-{{tool_name}}"'
+    - name: 'limiting the iii targegroup name to 32 characters'
+      set_fact: 'tg_name="{{tg_name_full [:32]}}"'
+    - debug: var=tg_name
+    - elb_target_group:
+        name: "{{ tg_name }}"
+        region: "us-east-2"
+        protocol: http
+        port: '{{ int_port}}'
+        vpc_id: vpc-c74a09ae
+        health_check_protocol: "HTTP"
+        health_check_path: "{{ health_check }}"
+        health_check_port: "{{port}}"
+        successful_response_codes: "200,250-260"
+        targets:
+          - Id: "{{ instance_id }}"
+            Port: '{{ int_port}}'
+        state: present
+      register: tg_info    
+    - debug: var=tg_info
+    - elb_application_lb:
+        name: "{{ org_name }}"
+        region: "us-east-2"
+        purge_rules: no
+        purge_listeners: no
+        security_groups:
+          - ansible-test-elb-sg
+        subnets:
+          - subnet-2edd4155
+          - subnet-86edbdef
+          - subnet-cedf7983
+        listeners:
+          - Protocol: HTTPS
+            Port: 443
+            # The security policy that defines which ciphers and protocols are supported. The default is the current predefined security policy.
+            SslPolicy: ELBSecurityPolicy-2015-05
+            Certificates: # The ARN of the certificate (only one certficate ARN should be provided)
+              - CertificateArn: arn:aws:acm:us-east-2:440953937617:certificate/9c8e1dd4-b22e-4921-9ca1-65fbe428ff02
+            DefaultActions:
+              - Type: forward
+                TargetGroupName: "tg-{{ org_name }}-elk"
+            Rules:
+              - Conditions:
+                  - Field: path-pattern
+                    Values:
+                      - "/elasticsearch*"
+                Priority: 1
+                Actions:
+                  - TargetGroupName: "tg-{{ org_name }}-elk"
+                    Type: forward
+
+        state: present
+      register: elb_info
+    - debug: var=elb_info
+    - name: 'retriveing the the number of rules in application elb'
+      set_fact: 'rules_count="{{ elb_info.listeners.1.rules | list | length | int + 1 }}"'
+    - debug: var=rules_count
+    - elb_application_lb:
+        name: "{{ org_name }}"
+        region: "us-east-2"
+        purge_rules: no
+        purge_listeners: no
+        security_groups:
+          - ansible-test-elb-sg
+        subnets:
+          - subnet-2edd4155
+          - subnet-86edbdef
+          - subnet-cedf7983
+        listeners:
+          - Protocol: HTTPS
+            Port: 443
+            # The security policy that defines which ciphers and protocols are supported. The default is the current predefined security policy.
+            SslPolicy: ELBSecurityPolicy-2015-05
+            Certificates: # The ARN of the certificate (only one certficate ARN should be provided)
+              - CertificateArn: arn:aws:acm:us-east-2:440953937617:certificate/9c8e1dd4-b22e-4921-9ca1-65fbe428ff02
+            DefaultActions:
+              - Type: forward
+                TargetGroupName: "tg-{{ org_name }}-elk"
+            Rules:
+              - Conditions:
+                  - Field: path-pattern
+                    Values:
+                      - "/{{app_name}}/{{tool_name}}*"
+                Priority: "{{ rules_count | string }}"
+                Actions:
+                  - TargetGroupName: "{{ tg_name }}"
+                    Type: forward
+        state: present
+      register: elb_info_2
+    - debug: var=elb_info_2
+

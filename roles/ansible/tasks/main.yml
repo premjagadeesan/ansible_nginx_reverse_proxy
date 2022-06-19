@@ -1,0 +1,8 @@
+---
+- name: Copy nginx configuration for wordpress
+  template: src=nginx.conf dest=/tmp/nginx.conf
+- name: Copy the nginx.conf file from tmp directory to docker container
+  shell: docker cp /tmp/nginx.conf {{ container_name }}:/etc/nginx/nginx.conf
+- name: restart docker container
+  shell: docker restart {{ container_name }}
+

@@ -1,0 +1,8 @@
+---
+- name: Copy nginx configuration for wordpress
+  template: src=nginx.conf dest=/etc/nginx/nginx.conf
+- name: Restart nginx reverse proxy
+  shell: service nginx restart
+- name: start docker container
+  shell: docker run -d -p 8080:8080 -p 50000:50000 --env  JENKINS_OPTS='--prefix=/{{app_name}}/{{tool_name}}' 440953937617.dkr.ecr.us-east-2.amazonaws.com/jenkins
+

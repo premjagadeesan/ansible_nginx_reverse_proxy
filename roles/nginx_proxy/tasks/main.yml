@@ -1,0 +1,6 @@
+---
+- name: Copy nginx configuration for wordpress
+  template: src=nginx.conf dest=/etc/nginx/nginx.conf
+- name: Restart nginx reverse proxy
+  shell: service nginx restart
+

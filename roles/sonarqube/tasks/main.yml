@@ -1,0 +1,8 @@
+---
+- name: Copy sonarqube conf to ec2 instance
+  template: src=sonar.properties dest=/tmp/sonar.properties
+- name: Copy the sonarqube conf file from tmp directory to docker container
+  shell: docker cp /tmp/sonar.properties {{ container_name }}:/opt/sonarqube/conf/sonar.properties
+- name: restart docker container
+  shell: docker restart {{ container_name }}
+
